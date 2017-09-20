@@ -63,5 +63,5 @@ main = do
             ("System.Exit", Nothing),
             ("System.Process.Typed", Nothing),
             ("TestModule", Nothing),
-            ("Text.Marskow", Just "M")
+            ("Text.Marskow", Nothing)
                           ]

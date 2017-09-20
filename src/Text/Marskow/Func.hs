@@ -17,7 +17,7 @@ import qualified Cheapskate.Types as C.T
 import qualified Language.Haskell.Interpreter as I
 import Text.XML.HXT.Core
 
-block :: (Monad m, MonadIO m, MonadMask m) => C.T.Block -> MarskowT m ()
+block :: (Monad m, MonadIO m, MonadMask m, Typeable m) => C.T.Block -> MarskowT m ()
 
 data MarskowRuntimeError
   = ScriptError I.InterpreterError
@@ -35,12 +35,13 @@ interpretCatched :: (I.MonadInterpreter m, Typeable a)
   -> m (Either MarskowRuntimeError a)
 interpretCatched expr wit = catch (Right <$> I.interpret expr wit) exceptionHandler
 
-interpret :: (Monad m, MonadIO m, MonadMask m)
+type ReturnT = Integer
+type MResultT a = Either MarskowRuntimeError a
+
+interpret :: (Monad m, MonadIO m, MonadMask m, Typeable m)
   => String
-  -> MarskowT m (Either MarskowRuntimeError Integer)
-interpret code = do
-      maybeAction <- liftInterpreter $ interpretCatched code (I.as :: IO Integer)
-      either (return . Left) (fmap Right . liftIO) maybeAction
+  -> MarskowT m (MResultT (MarskowT m ReturnT))
+interpret code = liftInterpreter $ interpretCatched code I.infer
 
 block bl@(C.T.HtmlBlock t) = do
   liftIO $ print t
@@ -49,8 +50,12 @@ block bl@(C.T.HtmlBlock t) = do
     Nothing -> justPushBlock bl
     Just code -> do
       maybeResult <- interpret code
-      liftIO $ putStrLn $ "OUTPUT: " ++ show maybeResult
-      return ()
+      case maybeResult of
+        Left err -> liftIO $ print err
+        Right resultM -> do
+          result <- resultM
+          liftIO $ putStrLn $ "OUTPUT: " ++ show result
+          return ()
 
   -- liftIO $ print maybeCommentCode
   -- val <- catch (maybe (return 0) (\d -> liftInterpreter $ I.interpret d (I.as :: Int)) maybeCommentCode) ((>> return 0) . liftIO . (print :: I.InterpreterError -> IO ()))
@@ -74,7 +79,7 @@ block bl = justPushBlock bl
 justPushBlock :: (Monad m) => C.T.Block -> MarskowT m ()
 justPushBlock bl = modify (\s -> s { blocks = bl : blocks s })
 
-foldBlocks :: (Monad m, MonadIO m, MonadMask m) => C.T.Blocks -> MarskowT m ()
+foldBlocks :: (Monad m, MonadIO m, MonadMask m, Typeable m) => C.T.Blocks -> MarskowT m ()
 foldBlocks = foldl bindSeq (return ())
   where bindSeq m bl = m >> block bl
 

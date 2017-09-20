@@ -9,8 +9,6 @@ t = 9
 <!--
 do
     cd "/"
-    M.runMarskowT
-    b "hhh"
     return 0
 -->
 
